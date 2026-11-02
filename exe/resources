@@ -2,5 +2,12 @@
 # frozen_string_literal: true
 
 require "resources"
+require "resources/rb/version"
 
-Resources::Application.new.build.run
+Resources::Cli.parse(ARGV).then do |options|
+  if options[:version]
+    puts "resources-rb #{Resources::Rb::VERSION}"
+  else
+    Resources::Application.new(options).build.run
+  end
+end

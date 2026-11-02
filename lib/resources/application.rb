@@ -3,52 +3,43 @@
 require "gtk4"
 require "adwaita"
 
+require_relative "main_window"
+require_relative "style"
+
 module Resources
-  # The port's application: one window, and a status page saying the port has
-  # not been written yet. Everything else grows from here — replace the status
-  # page with the real content, keep the shape.
+  # Application is the entry point: it installs the stylesheet and opens the
+  # main window.
+  #
+  # Ported from upstream's src/application.rs and src/bin/resources.rs. The
+  # window actions and accelerators upstream installs here live with the window
+  # that acts on them; what is left is the application object itself.
   #
   # House style (see .claude/skills/ruby-gtk): every widget is a memoized
   # method, all configuration lives in its `tap`, assembly happens only in
   # `build`, and the launcher is one expression.
   class Application
+    APP_ID = "net.nokyan.Resources"
+
+    def initialize(options = {})
+      @options = options
+    end
+
     def build
       app.tap do
         app.signal_connect("activate") do
-          window.tap do |win|
-            win.content = toolbar_view
-          end
-
-          toolbar_view.tap do |view|
-            view.add_top_bar(header_bar)
-            view.content = status_page
-          end
-
-          window.present
+          Style.install
+          main_window.build
+          main_window.present
         end
       end
     end
 
+    def run = app.run([])
+
     # Adwaita::Application is broken in the Ruby bindings; the application
-    # object comes from Gtk and only the window is Adwaita.
-    def app = @app ||= Gtk::Application.new("org.rubygtkproject.Resources", :default_flags)
+    # object comes from Gtk and only the window's contents are Adwaita.
+    def app = @app ||= Gtk::Application.new(APP_ID, :default_flags)
 
-    def window
-      @window ||= Adwaita::ApplicationWindow.new(app).tap do |win|
-        win.title = "resources"
-        win.set_default_size(800, 600)
-      end
-    end
-
-    def toolbar_view = @toolbar_view ||= Adwaita::ToolbarView.new
-    def header_bar = @header_bar ||= Adwaita::HeaderBar.new
-
-    def status_page
-      @status_page ||= Adwaita::StatusPage.new.tap do |page|
-        page.title = "resources"
-        page.description = "The Ruby port has not been written yet."
-        page.icon_name = "applications-engineering-symbolic"
-      end
-    end
+    def main_window = @main_window ||= MainWindow.new(app, @options)
   end
 end
