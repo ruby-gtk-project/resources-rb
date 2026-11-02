@@ -21,22 +21,26 @@ widgets as memoized accessors assembled in `build` with `.tap`.
 | | Upstream | `ruby` branch |
 |---|---:|---:|
 | `.ui` templates / named roots | 20 | 0 (none by design) |
-| UI source files (`src/ui/**`) | 25 | 1 |
+| UI units ported (window, widgets, pages, dialogs) | 25 | 11 |
 | GMenu models | 7 | 0 |
-| GActions (`app.*`) | 10 | 0 |
+| GActions (`app.*`) | 10 | 4 (`quit`, `settings`, `shortcuts`, `about`) |
 | GActions (`applications.*` / `processes.*`) | 8 + 10 | 0 |
-| Accelerators | 9 bindings over 9 actions | 0 |
-| GSettings keys | 53 | 0 |
+| Accelerators | 9 bindings over 9 actions | 3 bindings over 2 actions |
+| GSettings keys | 53 | 53 (file-backed `Resources::Settings`) |
 | Translatable strings (`po/resources.pot`) | 403 | 0 |
 | Locales (`po/LINGUAS`) | 40 | 0 |
 | Bundled symbolic icons (GResource) | 41 | 0 |
-| CSS classes defined in `data/resources/style.css` | 5 | 0 |
+| CSS classes defined in `data/resources/style.css` | 5 | 5 (`lib/resources/style.rb`) |
 
-The `ruby` branch has `lib/resources.rb`, `lib/resources/application.rb` (a
-stub: one `Adwaita::ApplicationWindow` + `Adwaita::ToolbarView` +
-`Adwaita::HeaderBar` + `Adwaita::StatusPage` reading "The Ruby port has not
-been written yet") and `lib/resources/rb/version.rb`. **No component below
-exists yet** except the application shell, which exists only as a placeholder.
+The `ruby` branch now has the application shell, the main window, the sidebar
+and its item, the three graph widgets, the Processor and Memory pages, the
+Preferences, Shortcuts and About dialogs, plus the settings, stylesheet, units,
+CLI and the CPU and memory data layers. Still missing: both ColumnView pages
+(Apps and Processes) with their entry models, name cells, context menus and
+confirmation dialog; the five per-device pages (GPU, NPU, drive, network,
+battery) and their data layers; the App, Process and Process Options dialogs;
+the icon bundle; the gettext catalogue; and the privileged helpers. Each
+component section below carries its own status.
 
 ## The user's path through the app
 
@@ -50,7 +54,7 @@ About off the primary menu.
 
 ## data/resources/ui/window.ui + src/ui/window.rs — the main window
 
-→ `lib/resources/main_window.rb` (window). **Missing.**
+→ `lib/resources/main_window.rb` (window). **Exists.**
 
 | Widget | × | CSS | Signals / bindings | Notes |
 |---|---:|---|---|---|
@@ -85,7 +89,7 @@ the last page is restored from `last-viewed-page`, and `--open-tab-id` overrides
 
 ## src/application.rs — the application
 
-→ `lib/resources/application.rb` (application). **Exists as a stub only.**
+→ `lib/resources/application.rb` (application). **Exists.**
 
 Installs 10 `app.*` actions: `quit`, `toggle-search`, `settings`, `about`,
 `end-app-process`, `kill-app-process`, `halt-app-process`,
@@ -105,7 +109,7 @@ icon name, and guards the Preferences dialog against being opened twice.
 
 ## src/application.rs (`show_about_dialog`) — About
 
-→ `lib/resources/about_dialog.rb` (dialog). **Missing.**
+→ `lib/resources/about_dialog.rb` (dialog). **Exists.**
 
 `Adw.AboutDialog` ×1: application name "Resources", app icon, issue URL,
 developer "nokyan", developers list, artists `["Avhiren"]`, GPL-3.0, version,
@@ -113,7 +117,7 @@ website, translator credits.
 
 ## data/resources/ui/shortcuts.ui — Keyboard Shortcuts
 
-→ `lib/resources/shortcuts_dialog.rb` (dialog). **Missing.**
+→ `lib/resources/shortcuts_dialog.rb` (dialog). **Exists.**
 
 `Adw.ShortcutsDialog` ×1, `Adw.ShortcutsSection` ×2, `Adw.ShortcutsItem` ×10.
 Section "General": Preferences, Show Shortcuts, Quit. Section "Apps/Processes":
@@ -123,7 +127,7 @@ Each item carries an `action-name`, so the accelerators come from the app.
 
 ## data/resources/ui/widgets/stack_sidebar.ui + src/ui/widgets/stack_sidebar.rs
 
-→ `lib/resources/stack_sidebar.rb` (widget). **Missing.**
+→ `lib/resources/stack_sidebar.rb` (widget). **Exists.**
 
 `Adw.Bin` (template `ResStackSidebar`) → `Gtk.ScrolledWindow` →
 `Gtk.Viewport` → `Gtk.ListBox` `list_box` (`navigation-sidebar`,
@@ -135,7 +139,7 @@ Battery 8). Repeater: one `Gtk.ListBoxRow` per `Gtk.StackPage`, rebuilt on
 
 ## data/resources/ui/widgets/stack_sidebar_item.ui + stack_sidebar_item.rs
 
-→ `lib/resources/stack_sidebar_item.rb` (widget). **Missing.**
+→ `lib/resources/stack_sidebar_item.rb` (widget). **Exists.**
 
 | Widget | × | CSS | Notes |
 |---|---:|---|---|
@@ -150,7 +154,7 @@ Battery 8). Repeater: one `Gtk.ListBoxRow` per `Gtk.StackPage`, rebuilt on
 
 ## src/ui/widgets/graph.rs — the graph
 
-→ `lib/resources/graph.rb` (widget). **Missing.**
+→ `lib/resources/graph.rb` (widget). **Exists.**
 
 A `Gtk.Widget` subclass (`ResGraph`) that overrides `snapshot`, appends a Cairo
 context and plots with the `plotters` crate: a ring of data points, settable
@@ -161,7 +165,7 @@ users: `graph`, `small-graph`. In Ruby this is a `Gtk::DrawingArea` with a
 
 ## data/resources/ui/widgets/graph_box.ui + graph_box.rs
 
-→ `lib/resources/graph_box.rb` (widget). **Missing.**
+→ `lib/resources/graph_box.rb` (widget). **Exists.**
 
 `Adw.PreferencesRow` (template `ResGraphBox`, `activatable=false`, 160px) with a
 suffix `Gtk.Box` holding `ResGraph` `graph` (`graph`, 120px), `Gtk.Label`
@@ -170,7 +174,7 @@ across the pages.
 
 ## data/resources/ui/widgets/double_graph_box.ui + double_graph_box.rs
 
-→ `lib/resources/double_graph_box.rb` (widget). **Missing.**
+→ `lib/resources/double_graph_box.rb` (widget). **Exists.**
 
 Same shape with two side-by-side columns: `ResGraph` `start_graph` / `end_graph`
 (both `graph`), `start_title_label` / `end_title_label` (`subtitle`),
@@ -272,7 +276,7 @@ Continue skips the dialog. Worth one file, used by both pages.
 
 ## data/resources/ui/pages/cpu.ui + src/ui/pages/cpu.rs — Processor
 
-→ `lib/resources/cpu_page.rb` (page). **Missing.**
+→ `lib/resources/cpu_page.rb` (page). **Exists.**
 
 `Adw.Bin` (`ResCPU`) → `Gtk.ScrolledWindow` → `Adw.Clamp` (768) → `Gtk.Box`.
 Group "Options" with `Adw.SwitchRow` `logical_switch` ("Show Usages of Logical
@@ -288,7 +292,7 @@ Logical Cores, Physical Cores, Sockets, Uptime, Virtualization, Architecture.
 
 ## data/resources/ui/pages/memory.ui + src/ui/pages/memory.rs — Memory
 
-→ `lib/resources/memory_page.rb` (page). **Missing.**
+→ `lib/resources/memory_page.rb` (page). **Exists.**
 
 `Adw.Bin` (`ResMemory`) → `Gtk.Box` with `Adw.Banner`
 `authentication_banner` ("You need to authenticate to see memory properties",
@@ -391,7 +395,7 @@ CPU added at runtime (repeater). Niceness vs. priority presentation follows
 
 ## data/resources/ui/dialogs/settings_dialog.ui + settings_dialog.rs — Preferences
 
-→ `lib/resources/settings_dialog.rb` (dialog). **Missing.**
+→ `lib/resources/settings_dialog.rb` (dialog). **Exists.**
 
 `Adw.PreferencesDialog` (template `ResSettingsDialog`), 4 `Adw.PreferencesPage`:
 
@@ -412,25 +416,25 @@ CPU added at runtime (repeater). Niceness vs. priority presentation follows
 
 Every row is two-way bound to a GSettings key.
 
-## Non-widget units the port still needs
+## Non-widget units
 
 | Upstream | → port | Kind |
 |---|---|---|
-| `data/net.nokyan.Resources.gschema.xml.in` + `src/utils/settings.rs` | `lib/resources/settings.rb` | settings (53 keys, change notification per key) |
-| `data/resources/style.css` | `lib/resources/style.rb` | stylesheet (`progressbar.slim`, `.resources-columnview`, `.bubble`, `.big-bubble`, `.small-graph`, `.graph`) |
-| `data/resources/icons/*.svg` (41) + `resources.gresource.xml` | `lib/resources/icons.rb` + `data/icons/` | resources (device/type icons the sidebar and cells name) |
-| `src/i18n.rs` + `po/` (40 locales, 403 strings) | `lib/resources/i18n.rb` + `po/` | i18n |
-| `src/utils/units.rs` | `lib/resources/units.rb` | formatting (every label's text) |
-| `src/utils/{app,process,cpu,memory,drive,network,battery,gpu/*,npu/*,link/*,pci,os,snapd}.rs`, `lib/process_data/` | `lib/resources/*.rb` | data layer (reads `/proc`, `/sys`, sysfs, udev, DMI) |
-| `src/bin/resources-{processes,kill,adjust}.rs`, `*.policy.in.in` | `lib/resources/privileged.rb` + polkit policy | privileged helpers (kill/renice/affinity, root process data) |
-| `src/gui.rs` (clap `Args`) | `exe/resources` | CLI (`--disable-*-monitoring`, `--no-suspend-pause`, `--open-tab-id`) |
+| `data/net.nokyan.Resources.gschema.xml.in` + `src/utils/settings.rs` | `lib/resources/settings.rb` | settings (53 keys, change notification per key) — **exists** |
+| `data/resources/style.css` | `lib/resources/style.rb` | stylesheet (`progressbar.slim`, `.resources-columnview`, `.bubble`, `.big-bubble`, `.small-graph`, `.graph`) — **exists** |
+| `data/resources/icons/*.svg` (41) + `resources.gresource.xml` | `lib/resources/icons.rb` + `data/icons/` | resources (device/type icons the sidebar and cells name) — **missing** |
+| `src/i18n.rs` + `po/` (40 locales, 403 strings) | `lib/resources/i18n.rb` + `po/` | i18n — **missing** |
+| `src/utils/units.rs` | `lib/resources/units.rb` | formatting (every label's text) — **exists** |
+| `src/utils/{app,process,cpu,memory,drive,network,battery,gpu/*,npu/*,link/*,pci,os,snapd}.rs`, `lib/process_data/` | `lib/resources/*.rb` | data layer (reads `/proc`, `/sys`, sysfs, udev, DMI) — **`cpu.rb` and `memory.rb` exist, the rest missing** |
+| `src/bin/resources-{processes,kill,adjust}.rs`, `*.policy.in.in` | `lib/resources/privileged.rb` + polkit policy | privileged helpers (kill/renice/affinity, root process data) — **missing** |
+| `src/gui.rs` (clap `Args`) | `lib/resources/cli.rb` + `exe/resources` | CLI (`--disable-*-monitoring`, `--no-suspend-pause`, `--open-tab-id`) — **exists** |
 
 ## Blockers and risks
 
-1. **`ResGraph` has no Ruby equivalent.** It is a `Gtk.Widget` subclass
-   overriding `snapshot` and plotting with the `plotters` crate. The port must
-   be a `Gtk::DrawingArea` with a hand-written Cairo `set_draw_func` (grid,
-   fill, line, locked max-Y). Everything visual in the app leans on it: 14
+1. ~~**`ResGraph` has no Ruby equivalent.**~~ **Resolved.**
+   `lib/resources/graph.rb` is a `Gtk::DrawingArea` with a hand-written Cairo
+   `set_draw_func` (grid, fill, line, locked max-Y), and `graph_box.rb` /
+   `double_graph_box.rb` wrap it. Everything visual in the app leans on it: 14
    `ResGraphBox`, 1 `ResDoubleGraphBox`, 1 per sidebar row, 1 per logical CPU.
 2. **The data layer is the bulk of the work and has no GTK in it.** ~5 500
    lines of Rust under `src/utils/` and `lib/process_data/` read `/proc`,
@@ -440,10 +444,10 @@ Every row is two-way bound to a GSettings key.
    `resources-kill` / `resources-adjust` and a polkit policy; memory properties
    go through `pkexec dmidecode`. The Ruby port needs its own story here, and
    none of it can be exercised under `xvfb-run` in this sandbox.
-4. **No GSettings schema on the `ruby` branch.** 53 keys drive column
-   visibility, sidebar presentation, refresh speed and window state. Either
-   install a compiled schema in the dev shell or write a file-backed settings
-   object with the same key names and change signals.
+4. ~~**No GSettings schema on the `ruby` branch.**~~ **Resolved.**
+   `lib/resources/settings.rb` is a file-backed object carrying all 53 keys,
+   upstream's defaults and a per-key change callback, so no compiled schema has
+   to be installed into the dev shell.
 5. **No gettext wiring.** 403 strings across 40 locales, with msgctxt contexts
    ("shortcut window", "process priority", "UI refresh speed") and plural forms
    in the toast messages. `translation-parity` cannot run until the port has a
@@ -464,11 +468,10 @@ Every row is two-way bound to a GSettings key.
    `attr_accessor` per property works and can be put in a `Gio::ListStore` and
    read by a `Gtk::PropertyExpression`, so the two ColumnViews are feasible —
    note that `install_property` alone is not enough, the accessor must exist.
-   Caveat from the house skill: `Adwaita::Application` and
-   `Adwaita::ApplicationWindow` are listed as broken, yet the existing
-   `lib/resources/application.rb` stub uses `Adwaita::ApplicationWindow`; that
-   needs settling before the window is built, since `Adw.Breakpoint` wants an
-   `Adw.ApplicationWindow`.
-8. **Scale.** 25 upstream UI source files and 20 templates against 1 port file.
-   The window, the two ColumnView pages and the settings dialog are each a
-   unit's worth of work on their own.
+   Settled: `Adwaita::ApplicationWindow` is unusable, so `main_window.rb` uses
+   a `Gtk::ApplicationWindow` holding an `Adwaita::BreakpointBin`, which takes
+   the `Adwaita::Breakpoint` upstream puts on its `Adw.ApplicationWindow`.
+8. **Scale.** 25 upstream UI source files and 20 templates; 11 UI units are
+   ported. The two ColumnView pages (Apps, Processes) with their entry models,
+   name cells, menus and action plumbing are the largest remaining items, then
+   the five per-device pages and their data layers.
