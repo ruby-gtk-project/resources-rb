@@ -20,10 +20,12 @@ module Resources
       ],
     }.freeze
 
-    # Memoized like every other widget method: the primary menu's Keyboard
-    # Shortcuts item and the `app.shortcuts` action both call `build` again on
-    # every open, and `section` builds a fresh widget each time, so without
-    # this guard a second open duplicates every section.
+    # A `ShortcutsDialog` is built once: `MainWindow` hands out a fresh
+    # instance every time it's opened (primary menu item or the
+    # `app.shortcuts` action), since `Adwaita::Dialog` cannot be re-presented
+    # once closed. This guard still protects a direct second call to `build`
+    # on the same instance, where `section` would build and add a duplicate
+    # of every section rather than a no-op.
     def build
       dialog.tap do |shortcuts|
         unless @built

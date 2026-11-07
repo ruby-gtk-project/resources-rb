@@ -190,6 +190,15 @@ module Resources
 
     def cpu_info = @cpu_info ||= Cpu.info
 
+    # The accessor memoizes only so a caller that hasn't opened one yet (a
+    # test, say) gets a built widget to inspect. Once a dialog has been
+    # presented and closed, `Adwaita::Dialog#present` cannot be called on it
+    # again -- its internal widget stays parented after `close`, and a second
+    # `present` is a `gtk_widget_set_parent` GTK-CRITICAL that leaves the
+    # dialog in a broken, half-shown state. Upstream (`show_settings_dialog`,
+    # `show_about_dialog` in `src/application.rs`) avoids this the same way
+    # every dialog-opening action below does: build a fresh instance each
+    # time the dialog is opened, rather than reusing a closed one.
     def about_dialog = @about_dialog ||= AboutDialog.new
     def shortcuts_dialog = @shortcuts_dialog ||= ShortcutsDialog.new
     def settings_dialog = @settings_dialog ||= SettingsDialog.new
@@ -274,10 +283,27 @@ module Resources
       def actions
         {
           "quit"      => -> { quit },
-          "settings"  => -> { settings_dialog.build.present(window) },
-          "shortcuts" => -> { shortcuts_dialog.build.present(window) },
-          "about"     => -> { about_dialog.build.present(window) },
+          "settings"  => -> { open_settings_dialog },
+          "shortcuts" => -> { open_shortcuts_dialog },
+          "about"     => -> { open_about_dialog },
         }
+      end
+
+      # Every open gets its own dialog instance -- see the comment on the
+      # memoized accessors above for why a closed one can't be reused -- and
+      # it replaces whatever the accessor last held, so
+      # `settings_dialog`/`shortcuts_dialog`/`about_dialog` still return
+      # whichever dialog is actually on screen.
+      def open_settings_dialog
+        @settings_dialog = SettingsDialog.new.tap { |dialog| dialog.build.present(window) }
+      end
+
+      def open_shortcuts_dialog
+        @shortcuts_dialog = ShortcutsDialog.new.tap { |dialog| dialog.build.present(window) }
+      end
+
+      def open_about_dialog
+        @about_dialog = AboutDialog.new.tap { |dialog| dialog.build.present(window) }
       end
 
       # Upstream drives the refresh from an async loop that re-reads its delay

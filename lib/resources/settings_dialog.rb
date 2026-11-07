@@ -185,10 +185,12 @@ module Resources
       @rows = {}
     end
 
-    # Memoized like every other widget method: the primary menu's Preferences
-    # item, the `app.settings` action and `<Control>comma` all call `build`
-    # again on every open, and a second round of `preferences.add` on already
-    # parented rows is a GTK critical, not a no-op.
+    # A `SettingsDialog` is built once: `MainWindow` hands out a fresh
+    # instance every time Preferences is opened (direct menu item, the
+    # `app.settings` action, or `<Control>comma`), since `Adwaita::Dialog`
+    # cannot be re-presented once closed. This guard still protects a direct
+    # second call to `build` on the same instance, where `preferences.add` on
+    # already-parented rows would be a GTK critical rather than a no-op.
     def build
       dialog.tap do |preferences|
         unless @built

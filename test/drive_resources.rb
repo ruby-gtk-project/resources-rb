@@ -103,6 +103,44 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
     d.shot("01-main-window")
   end
 
+  d.step("BatteryPage builds and refreshes against synthetic sysfs data (unwired component: " \
+         "this machine has no battery, so main_window's own battery_pages list is empty and " \
+         "the sidebar never reaches this page)") do
+    sysfs_path = Dir.mktmpdir("resources-drive-battery")
+    File.write(File.join(sysfs_path, "type"), "Battery")
+    File.write(File.join(sysfs_path, "capacity"), "77")
+    File.write(File.join(sysfs_path, "status"), "Discharging")
+    File.write(File.join(sysfs_path, "manufacturer"), "ACME")
+    File.write(File.join(sysfs_path, "model_name"), "Cell9000")
+    File.write(File.join(sysfs_path, "technology"), "Li-ion")
+    File.write(File.join(sysfs_path, "energy_full_design"), "50000000")
+    File.write(File.join(sysfs_path, "cycle_count"), "42")
+    File.write(File.join(sysfs_path, "power_now"), "9000000")
+
+    page = Resources::BatteryPage.new(sysfs_path, 0)
+    page.build
+    page.refresh_page(Resources::Battery.data_for(sysfs_path))
+
+    d.check("tab name is the battery's display name") { page.tab_name.include?("Battery") }
+    d.check("usage reflects the synthetic charge") { page.usage == 0.77 }
+    d.check("tab usage string mentions the charge percentage") { page.tab_usage_string.include?("77") }
+    d.check("health row falls back to N/A without energy_full") { page.health_row.subtitle == "N/A" }
+    d.check("manufacturer row reads back the synthetic value") { page.manufacturer_row.subtitle == "ACME" }
+    d.check("charge cycles row reads back the synthetic value") { page.charge_cycles_row.subtitle == "42" }
+
+    window = application.main_window.window
+    @battery_dialog = Adwaita::AlertDialog.new("Battery preview", nil).tap do |dialog|
+      dialog.extra_child = page.bin
+      dialog.present(window)
+    end
+    d.check("battery page fixture dialog presents") { @battery_dialog.visible? }
+  end
+
+  d.step("BatteryPage screenshot (its own tick, so the fixture dialog has settled)") do
+    d.shot("09-battery-page", @battery_dialog)
+    @battery_dialog.close
+  end
+
   d.step("ProcessActionDialog builds and presents against the real window (unwired component)") do
     window = application.main_window.window
     confirmed = false
