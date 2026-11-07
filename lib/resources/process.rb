@@ -169,6 +169,14 @@ module Resources
 
         def monotonic_ms = (::Process.clock_gettime(::Process::CLOCK_MONOTONIC) * 1000).to_i
 
+        # /proc/<pid>/status's Cpus_allowed is a hex bitmask, split into
+        # comma-separated 32-bit groups once there are more than 32 CPUs.
+        def cpus_allowed_mask(pid)
+          status = read_file(File.join(PROC, pid.to_s, "status"))
+          hex = status&.[](/^Cpus_allowed:\s*(\S+)/, 1)
+          hex ? hex.delete(",").to_i(16) : 0
+        end
+
         def read_file(path)
           File.read(path)
         rescue SystemCallError, IOError
@@ -245,7 +253,29 @@ module Resources
       system("pkexec", "kill", "-s", signal, @data.pid.to_s, exception: true)
     end
 
+    # Upstream's Process::affinity, read from /proc/<pid>/status's
+    # Cpus_allowed bitmask rather than through the privileged companion
+    # process: one boolean per logical CPU, true where the process may run.
+    def affinity
+      mask = self.class.send(:cpus_allowed_mask, @data.pid)
+      Array.new(self.class.num_cpus) { |index| mask[index] == 1 }
+    end
+
+    # Upstream's Process::set_affinity, going through `pkexec` the same way
+    # the process actions above do when the plain `taskset` call is refused.
+    def set_affinity(flags)
+      list = flags.each_index.select { |index| flags[index] }.join(",")
+      list = "0" if list.empty?
+      taskset(list)
+    end
+
     private
+
+      def taskset(list)
+        system("taskset", "-pc", list, @data.pid.to_s, exception: true)
+      rescue Errno::EACCES, Errno::EPERM
+        system("pkexec", "taskset", "-pc", list, @data.pid.to_s, exception: true)
+      end
 
       def speed_of(current, last)
         if current && last

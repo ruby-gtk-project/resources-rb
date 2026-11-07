@@ -6,9 +6,10 @@
 # directly and by firing the installed `app.*` actions the same way their
 # keyboard accelerators do — toggles a setting in each kind of Preferences
 # row, and exercises the process data layer and the still-unwired
-# ProcessActionDialog confirmation dialog (built but not yet reachable from
-# any page, since the Apps/Processes ColumnView pages that would open it do
-# not exist on this branch). Screenshots every state.
+# ProcessActionDialog, ProcessDialog and ProcessOptionsDialog confirmation
+# dialogs, plus the ProcessNameCell widget (all built but not yet reachable
+# from any page, since the Apps/Processes ColumnView pages that would open
+# them do not exist on this branch). Screenshots every state.
 #
 # Why this file exists: a GTK app that loads is not a GTK app that works.
 # `ruby -c` passes on code that builds an empty window, and the Ruby bindings
@@ -40,6 +41,9 @@ require_relative "gtk_driver"
 require "resources/process"
 require "resources/process_entry"
 require "resources/process_action_dialog"
+require "resources/process_dialog"
+require "resources/process_options_dialog"
+require "resources/process_name_cell"
 
 SHOTS = File.expand_path("../tmp/shots", __dir__)
 FileUtils.rm_rf(SHOTS)
@@ -166,6 +170,76 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
   d.step("ProcessActionDialog screenshot (its own tick, so the alert has settled)") do
     d.shot("02-process-action-dialog", @process_action_alert)
     @process_action_alert.close
+  end
+
+  d.step("ProcessNameCell renders an icon beside an elided name (unwired component)") do
+    cell = Resources::ProcessNameCell.new
+    cell.build
+    cell.name = "firefox"
+    cell.tooltip = "/usr/bin/firefox"
+    cell.icon = Gio::ThemedIcon.new("firefox")
+    cell.symbolic = false
+    d.check("name round-trips through the inscription") { cell.name == "firefox" }
+    d.check("tooltip round-trips through the inscription") { cell.tooltip == "/usr/bin/firefox" }
+    d.check("a non-symbolic icon gets the lowres-icon class") { cell.image.css_classes.include?("lowres-icon") }
+    cell.symbolic = true
+    d.check("a symbolic icon drops the lowres-icon class") { cell.image.css_classes.empty? }
+    @process_name_cell = cell
+  end
+
+  d.step("ProcessDialog builds from a real ProcessEntry (unwired component)") do
+    window = application.main_window.window
+    process = Resources::Process.all.find { |candidate| candidate.pid == ::Process.pid }
+    entry = Resources::ProcessEntry.new(process)
+    dialog = Resources::ProcessDialog.new(entry, Etc.getlogin)
+    dialog.present(window)
+    d.check("dialog title is Process Information") { dialog.dialog.title == "Process Information" }
+    d.check("name label shows the process's display name") { dialog.name_label.label == entry.name }
+    d.check("pid row shows this test's own pid") { dialog.pid_row.subtitle == ::Process.pid.to_s }
+    d.check("user row shows the login name") { dialog.user_row.subtitle == Etc.getlogin }
+    d.check("GPU row falls back to N/A (gpu.rb not ported yet)") { dialog.gpu_usage_row.subtitle == "N/A" }
+    entry.update(process)
+    dialog.update(entry)
+    d.check("update re-reads the memory row without raising") { !dialog.memory_usage_row.subtitle.to_s.empty? }
+    @process_dialog = dialog.dialog
+  end
+
+  d.step("ProcessDialog screenshot (its own tick, so the dialog has settled)") do
+    d.shot("10-process-dialog", @process_dialog)
+    @process_dialog.close
+  end
+
+  d.step("ProcessOptionsDialog builds one affinity row per logical CPU (unwired component)") do
+    window = application.main_window.window
+    process = Resources::Process.all.find { |candidate| candidate.pid == ::Process.pid }
+    overlay = Adwaita::ToastOverlay.new
+    dialog = Resources::ProcessOptionsDialog.new(process, "ruby", overlay)
+    dialog.present(window)
+    d.check("dialog title is Process Options") { dialog.dialog.title == "Process Options" }
+    d.check("name label shows the given name") { dialog.name_label.label == "ruby" }
+    d.check("one switch row per logical CPU") { dialog.cpu_rows.length == Etc.nprocessors }
+    d.check("niceness row is visible only when detailed priority is on") do
+      dialog.nice_row.visible? == Resources::Settings.instance.detailed_priority?
+    end
+    d.check("exactly one of the niceness/priority rows is visible") do
+      dialog.nice_row.visible? != dialog.priority_row.visible?
+    end
+
+    first_row = dialog.cpu_rows.first
+    first_row.active = false
+    d.check("toggling a switch row off still leaves the apply button sensitive " \
+            "when another CPU stays on") { dialog.apply_button.sensitive? }
+    dialog.cpu_rows.each { |row| row.active = false }
+    d.check("toggling every switch row off disables the apply button") { !dialog.apply_button.sensitive? }
+    dialog.select_all_button.signal_emit("clicked")
+    d.check("Toggle All turns every switch row back on") { dialog.cpu_rows.all?(&:active?) }
+
+    @process_options_dialog = dialog.dialog
+  end
+
+  d.step("ProcessOptionsDialog screenshot (its own tick, so the dialog has settled)") do
+    d.shot("11-process-options-dialog", @process_options_dialog)
+    @process_options_dialog.close
   end
 
   # --- Sidebar navigation ----------------------------------------------------
