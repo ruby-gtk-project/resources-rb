@@ -18,7 +18,7 @@ file, stylesheet, icon set, po catalogue).
 | `src/application.rs`, `src/bin/resources.rs` | `lib/resources/application.rb` | app | Yes |
 | `src/application.rs` (`show_about_dialog`) | `lib/resources/about_dialog.rb` | dialog | Yes |
 | `src/gui.rs` (clap `Args`) | `lib/resources/cli.rb` | util | Yes |
-| `data/resources/ui/window.ui`, `src/ui/window.rs` | `lib/resources/main_window.rb` | window | Yes — but only wires the CPU and Memory pages into the sidebar; Applications, Processes, Battery, Drive, GPU, Network and NPU pages are not instantiated here because they do not exist yet (see Pages) |
+| `data/resources/ui/window.ui`, `src/ui/window.rs` | `lib/resources/main_window.rb` | window | Yes — wires CPU, Memory and (per-`sysfs_paths`) Battery pages into the sidebar; Applications, Processes, Drive, GPU, Network and NPU pages are still not instantiated here because they do not exist yet (see Pages) |
 | `data/resources/ui/widgets/stack_sidebar.ui`, `src/ui/widgets/stack_sidebar.rs` | `lib/resources/stack_sidebar.rb` | widget | Yes |
 | `data/resources/ui/widgets/stack_sidebar_item.ui`, `src/ui/widgets/stack_sidebar_item.rs` | `lib/resources/stack_sidebar_item.rb` | widget | Yes |
 | `data/resources/ui/shortcuts.ui` | `lib/resources/shortcuts_dialog.rb` | dialog | Yes — its own comment notes the second shortcut section ("Apps/Processes") lists actions for views that do not exist yet in the port |
@@ -31,7 +31,7 @@ file, stylesheet, icon set, po catalogue).
 | `src/ui/pages/memory.rs`, `data/resources/ui/pages/memory.ui` | `lib/resources/memory_page.rb` | page | Yes |
 | `src/ui/pages/applications/mod.rs`, `src/ui/pages/applications/application_entry.rs`, `data/resources/ui/pages/applications.ui` | `lib/resources/applications_page.rb` (+ `lib/resources/application_entry.rb`) | page + row model | **No** |
 | `src/ui/pages/processes/mod.rs`, `data/resources/ui/pages/processes.ui` | `lib/resources/processes_page.rb` | page | **No** — `process_entry.rb` (the row model) exists, but the page itself does not |
-| `src/ui/pages/battery.rs`, `data/resources/ui/pages/battery.ui` | `lib/resources/battery_page.rb` | page | **No** |
+| `src/ui/pages/battery.rs`, `data/resources/ui/pages/battery.ui` | `lib/resources/battery_page.rb` | page | Yes — one instance per `Battery.sysfs_paths` entry, wired into `main_window.rb` |
 | `src/ui/pages/drive.rs`, `data/resources/ui/pages/drive.ui` | `lib/resources/drive_page.rb` | page | **No** |
 | `src/ui/pages/gpu.rs`, `data/resources/ui/pages/gpu.ui` | `lib/resources/gpu_page.rb` | page | **No** |
 | `src/ui/pages/network.rs`, `data/resources/ui/pages/network.ui` | `lib/resources/network_page.rb` | page | **No** |
@@ -77,7 +77,7 @@ file, stylesheet, icon set, po catalogue).
 | `src/utils/settings.rs` + `data/net.nokyan.Resources.gschema.xml.in` | `lib/resources/settings.rb` | util + resource | Yes — JSON-backed stand-in for GSettings; all ~50 schema keys are present in `Settings::DEFAULTS` |
 | `src/utils/snapd.rs` | `lib/resources/snapd.rb` | util | Yes |
 | `src/utils/app.rs` | `lib/resources/app.rb` | util | **No** — backs the Applications page |
-| `src/utils/battery.rs` | `lib/resources/battery.rb` | util | **No** — backs the Battery page |
+| `src/utils/battery.rs` | `lib/resources/battery.rb` | util | Yes |
 | `src/utils/drive.rs` | `lib/resources/drive.rb` | util | **No** — backs the Drive page |
 | `src/utils/network.rs` | `lib/resources/network.rb` | util | **No** — backs the Network page |
 | `src/utils/gpu/mod.rs`, `amd.rs`, `intel.rs`, `nvidia.rs`, `other.rs`, `v3d.rs` | `lib/resources/gpu.rb` (+ per-vendor files or branches) | util | **No** — backs the GPU page |
@@ -99,14 +99,14 @@ file, stylesheet, icon set, po catalogue).
 
 ## Summary
 
-- **Ported (11 files have a working lib/ counterpart):** application, about dialog,
+- **Ported (13 files have a working lib/ counterpart):** application, about dialog,
   cli, main window, stack sidebar + item, shortcuts dialog, CPU page, memory
-  page, graph / graph box / double graph box, settings dialog, settings,
-  process entry, process action (confirm) dialog, os, pci, units, snapd,
-  process (util), cpu/memory (util).
-- **Missing pages (7):** Applications, Processes, Battery, Drive, GPU,
-  Network, NPU — none of these stack pages exist in `lib/` yet, so
-  `main_window.rb` only ever shows CPU and Memory.
+  page, battery page, graph / graph box / double graph box, settings dialog,
+  settings, process entry, process action (confirm) dialog, os, pci, units,
+  snapd, battery (util), process (util), cpu/memory (util).
+- **Missing pages (6):** Applications, Processes, Drive, GPU, Network, NPU —
+  none of these stack pages exist in `lib/` yet. `main_window.rb` now shows
+  CPU, Memory and (per-battery) Battery pages.
 - **Missing dialogs (3):** process details (`process_dialog.ui`), process
   niceness/priority editor (`process_options_dialog.ui`), application details
   (`app_dialog.ui`). These are distinct from the already-ported
@@ -114,13 +114,13 @@ file, stylesheet, icon set, po catalogue).
   the one dialog done.
 - **Missing row/cell widgets (2):** `application_entry`/`application_name_cell`,
   `process_name_cell`.
-- **Missing backing utilities (8 upstream modules, several multi-file):**
-  `app`, `battery`, `drive`, `network`, `gpu/*` (5 files), `npu/*` (4 files),
+- **Missing backing utilities (7 upstream modules, several multi-file):**
+  `app`, `drive`, `network`, `gpu/*` (5 files), `npu/*` (4 files),
   `link/*` (5 files).
 - **Missing non-code resources:** desktop entry, AppStream metainfo, polkit
   policy and the three root-helper binaries it authorizes; icon-asset parity
   unchecked; translation parity unchecked (separate skill).
 
 This is a map of how much is left, not a plan — the next step is to pick one
-unit (e.g. the Battery page, the simplest of the missing pages) and port it
-following `.claude/skills/ruby-gtk`.
+unit (e.g. the Drive page, the simplest of the still-missing pages) and port
+it following `.claude/skills/ruby-gtk`.
