@@ -3,6 +3,8 @@
 require "adwaita"
 
 require_relative "about_dialog"
+require_relative "battery"
+require_relative "battery_page"
 require_relative "cpu"
 require_relative "cpu_page"
 require_relative "memory"
@@ -153,7 +155,7 @@ module Resources
     # the matching --disable-… flag is given; here the flag keeps the page out
     # of the list in the first place.
     def pages
-      @pages ||= [cpu_page, memory_page].compact
+      @pages ||= [cpu_page, memory_page, *battery_pages].compact
     end
 
     def cpu_page
@@ -176,6 +178,14 @@ module Resources
       end
 
       @memory_page
+    end
+
+    def battery_pages
+      @battery_pages ||= if @options[:disable_battery_monitoring]
+        []
+      else
+        Battery.sysfs_paths.each_with_index.map { |path, index| BatteryPage.new(path, index) }
+      end
     end
 
     def cpu_info = @cpu_info ||= Cpu.info
@@ -293,12 +303,17 @@ module Resources
       def refresh
         refresh_cpu
         refresh_memory
+        refresh_batteries
         sidebar.refresh
         open_last_viewed_page
       end
 
       def refresh_cpu
         cpu_page&.refresh_page(Cpu.data(cpu_info.logical_cpus || 0))
+      end
+
+      def refresh_batteries
+        battery_pages.each { |page| page.refresh_page(Battery.data_for(page.sysfs_path)) }
       end
 
       def refresh_memory
