@@ -185,9 +185,16 @@ module Resources
       @rows = {}
     end
 
+    # Memoized like every other widget method: the primary menu's Preferences
+    # item, the `app.settings` action and `<Control>comma` all call `build`
+    # again on every open, and a second round of `preferences.add` on already
+    # parented rows is a GTK critical, not a no-op.
     def build
       dialog.tap do |preferences|
-        PAGES.each { |title, icon, groups| preferences.add(page(title, icon, groups)) }
+        unless @built
+          @built = true
+          PAGES.each { |title, icon, groups| preferences.add(page(title, icon, groups)) }
+        end
       end
     end
 

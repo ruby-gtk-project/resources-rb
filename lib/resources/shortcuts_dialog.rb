@@ -20,10 +20,17 @@ module Resources
       ],
     }.freeze
 
+    # Memoized like every other widget method: the primary menu's Keyboard
+    # Shortcuts item and the `app.shortcuts` action both call `build` again on
+    # every open, and `section` builds a fresh widget each time, so without
+    # this guard a second open duplicates every section.
     def build
       dialog.tap do |shortcuts|
-        SECTIONS.each do |title, items|
-          shortcuts.add(section(title, items))
+        unless @built
+          @built = true
+          SECTIONS.each do |title, items|
+            shortcuts.add(section(title, items))
+          end
         end
       end
     end
