@@ -425,7 +425,7 @@ Every row is two-way bound to a GSettings key.
 | `data/resources/icons/*.svg` (41) + `resources.gresource.xml` | `lib/resources/icons.rb` + `data/icons/` | resources (device/type icons the sidebar and cells name) — **missing** |
 | `src/i18n.rs` + `po/` (40 locales, 403 strings) | `lib/resources/i18n.rb` + `po/` | i18n — **missing** |
 | `src/utils/units.rs` | `lib/resources/units.rb` | formatting (every label's text) — **exists** |
-| `src/utils/{app,process,cpu,memory,drive,network,battery,gpu/*,npu/*,link/*,pci,os,snapd}.rs`, `lib/process_data/` | `lib/resources/*.rb` | data layer (reads `/proc`, `/sys`, sysfs, udev, DMI) — **`cpu.rb` and `memory.rb` exist, the rest missing** |
+| `src/utils/{app,process,cpu,memory,drive,network,battery,gpu/*,npu/*,link/*,pci,os,snapd}.rs`, `lib/process_data/` | `lib/resources/*.rb` | data layer (reads `/proc`, `/sys`, sysfs, udev, DMI) — **`cpu.rb`, `memory.rb`, `process.rb`, `pci.rb`, `os.rb` and `snapd.rb` exist; `app.rb`, `drive.rb`, `network.rb`, `battery.rb`, `gpu/*.rb`, `npu/*.rb` and `link/*.rb` still missing** |
 | `src/bin/resources-{processes,kill,adjust}.rs`, `*.policy.in.in` | `lib/resources/privileged.rb` + polkit policy | privileged helpers (kill/renice/affinity, root process data) — **missing** |
 | `src/gui.rs` (clap `Args`) | `lib/resources/cli.rb` + `exe/resources` | CLI (`--disable-*-monitoring`, `--no-suspend-pause`, `--open-tab-id`) — **exists** |
 
