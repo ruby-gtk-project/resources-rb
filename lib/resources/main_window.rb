@@ -9,6 +9,8 @@ require_relative "cpu"
 require_relative "cpu_page"
 require_relative "memory"
 require_relative "memory_page"
+require_relative "process"
+require_relative "processes_page"
 require_relative "settings"
 require_relative "settings_dialog"
 require_relative "shortcuts_dialog"
@@ -155,7 +157,18 @@ module Resources
     # the matching --disable-… flag is given; here the flag keeps the page out
     # of the list in the first place.
     def pages
-      @pages ||= [cpu_page, memory_page, *battery_pages].compact
+      @pages ||= [processes_page, cpu_page, memory_page, *battery_pages].compact
+    end
+
+    def processes_page
+      unless defined?(@processes_page)
+        @processes_page = nil
+        unless @options[:disable_process_monitoring]
+          @processes_page = ProcessesPage.new
+        end
+      end
+
+      @processes_page
     end
 
     def cpu_page
@@ -330,8 +343,13 @@ module Resources
         refresh_cpu
         refresh_memory
         refresh_batteries
+        refresh_processes
         sidebar.refresh
         open_last_viewed_page
+      end
+
+      def refresh_processes
+        processes_page&.refresh_page(Process.all)
       end
 
       def refresh_cpu

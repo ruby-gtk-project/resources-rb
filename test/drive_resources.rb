@@ -1,15 +1,14 @@
 # frozen_string_literal: true
 
 # Drives the whole app headlessly: builds the main window, walks every
-# sidebar page, exercises the Processor and Memory pages' own controls,
-# opens every dialog reachable from the primary menu — both by building them
-# directly and by firing the installed `app.*` actions the same way their
-# keyboard accelerators do — toggles a setting in each kind of Preferences
-# row, and exercises the process data layer and the still-unwired
+# sidebar page, exercises the Processor, Memory and Processes pages' own
+# controls, opens every dialog reachable from the primary menu — both by
+# building them directly and by firing the installed `app.*` actions the same
+# way their keyboard accelerators do — toggles a setting in each kind of
+# Preferences row, and exercises the process data layer and the
 # ProcessActionDialog, ProcessDialog and ProcessOptionsDialog confirmation
-# dialogs, plus the ProcessNameCell widget (all built but not yet reachable
-# from any page, since the Apps/Processes ColumnView pages that would open
-# them do not exist on this branch). Screenshots every state.
+# dialogs both directly and through the Processes page that now hosts them,
+# plus the ProcessNameCell widget. Screenshots every state.
 #
 # Why this file exists: a GTK app that loads is not a GTK app that works.
 # `ruby -c` passes on code that builds an empty window, and the Ruby bindings
@@ -35,9 +34,9 @@ $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 require "resources"
 require_relative "gtk_driver"
 
-# Not required by lib/resources.rb: these three are ported but not yet wired
-# into any page (the Apps/Processes ColumnView pages that would use them do
-# not exist on this branch), so they need their own require here.
+# Already pulled in transitively through main_window -> processes_page, but
+# required explicitly too: the steps below construct them directly, ahead of
+# (and independently of) the Processes page that also uses them.
 require "resources/process"
 require "resources/process_entry"
 require "resources/process_action_dialog"
@@ -98,11 +97,11 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
 
   # --- The main window ------------------------------------------------------
 
-  d.step("main window builds with both default pages") do
+  d.step("main window builds with the default pages") do
     window = application.main_window
     d.check("window title is Resources") { window.window.title == "Resources" }
-    d.check("sidebar lists cpu and memory") do
-      window.sidebar.items.values.map(&:tab_id).sort == ["cpu", "memory"]
+    d.check("sidebar lists processes, cpu and memory") do
+      window.sidebar.items.values.map(&:tab_id).sort == ["cpu", "memory", "processes"]
     end
     d.shot("01-main-window")
   end
@@ -145,7 +144,7 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
     @battery_dialog.close
   end
 
-  d.step("ProcessActionDialog builds and presents against the real window (unwired component)") do
+  d.step("ProcessActionDialog builds and presents against the real window (also reachable now from the Processes page)") do
     window = application.main_window.window
     confirmed = false
     dialog = Resources::ProcessActionDialog.new(
@@ -172,7 +171,7 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
     @process_action_alert.close
   end
 
-  d.step("ProcessNameCell renders an icon beside an elided name (unwired component)") do
+  d.step("ProcessNameCell renders an icon beside an elided name (also used by the Processes page's rows)") do
     cell = Resources::ProcessNameCell.new
     cell.build
     cell.name = "firefox"
@@ -187,7 +186,7 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
     @process_name_cell = cell
   end
 
-  d.step("ProcessDialog builds from a real ProcessEntry (unwired component)") do
+  d.step("ProcessDialog builds from a real ProcessEntry (also reachable now from the Processes page)") do
     window = application.main_window.window
     process = Resources::Process.all.find { |candidate| candidate.pid == ::Process.pid }
     entry = Resources::ProcessEntry.new(process)
@@ -209,7 +208,7 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
     @process_dialog.close
   end
 
-  d.step("ProcessOptionsDialog builds one affinity row per logical CPU (unwired component)") do
+  d.step("ProcessOptionsDialog builds one affinity row per logical CPU (also reachable now from the Processes page)") do
     window = application.main_window.window
     process = Resources::Process.all.find { |candidate| candidate.pid == ::Process.pid }
     overlay = Adwaita::ToastOverlay.new
@@ -240,6 +239,86 @@ GtkDriver.drive(Resources::Application.new, shots: SHOTS) do |d, application|
   d.step("ProcessOptionsDialog screenshot (its own tick, so the dialog has settled)") do
     d.shot("11-process-options-dialog", @process_options_dialog)
     @process_options_dialog.close
+  end
+
+  # --- The Processes page, now that it actually exists ----------------------
+
+  d.step("sidebar selects the Processes page") do
+    window = application.main_window
+    window.sidebar.select_tab_id("processes")
+    d.check("content stack shows the processes page") do
+      window.content_stack.visible_child_name == "processes"
+    end
+    d.check("tab usage string names the running process count") do
+      window.processes_page.tab_usage_string.start_with?("Running Processes: ")
+    end
+    d.shot("12-processes-page")
+  end
+
+  d.step("Processes page lists this test's own process by name and PID") do
+    page = application.main_window.processes_page
+    own_pid = ::Process.pid
+    d.check("a row exists for this test's own pid") { page.instance_variable_get(:@rows).key?(own_pid) }
+    d.check("an entry exists for this test's own pid") { page.instance_variable_get(:@entries).key?(own_pid) }
+  end
+
+  d.step("Processes page search filters the row list down to a match") do
+    page = application.main_window.processes_page
+    own_entry = page.instance_variable_get(:@entries).fetch(::Process.pid)
+    page.search_entry.text = own_entry.name
+    page.search_entry.signal_emit("search-changed")
+    d.check("the matching row survives the filter") { page.list_box.observe_children.n_items >= 1 }
+    page.search_entry.text = "a-process-name-that-cannot-possibly-exist-anywhere"
+    page.search_entry.signal_emit("search-changed")
+    d.check("an impossible search empties the row list") { page.list_box.observe_children.n_items.zero? }
+    page.search_entry.text = ""
+    page.search_entry.signal_emit("search-changed")
+  end
+
+  d.step("Processes page selection enables and disables its actions") do
+    page = application.main_window.processes_page
+    group = page.action_group
+    d.check("nothing selected: end/kill/halt/continue start disabled") do
+      !group.lookup_action("end-process").enabled?
+    end
+    d.check("nothing selected: options/information start disabled") do
+      !group.lookup_action("options").enabled?
+    end
+
+    row = page.instance_variable_get(:@rows).fetch(::Process.pid)
+    page.list_box.select_row(row)
+    page.list_box.signal_emit("selected-rows-changed")
+
+    d.check("one row selected: end-process becomes enabled") { group.lookup_action("end-process").enabled? }
+    d.check("one row selected: options becomes enabled") { group.lookup_action("options").enabled? }
+    d.check("one row selected: information becomes enabled") { group.lookup_action("information").enabled? }
+
+    page.list_box.unselect_all
+    page.list_box.signal_emit("selected-rows-changed")
+    d.check("deselecting disables end-process again") { !group.lookup_action("end-process").enabled? }
+  end
+
+  d.step("Processes page's Information action opens a live ProcessDialog") do
+    page = application.main_window.processes_page
+    row = page.instance_variable_get(:@rows).fetch(::Process.pid)
+    page.list_box.select_row(row)
+    page.list_box.signal_emit("selected-rows-changed")
+
+    group = page.action_group
+    group.activate_action("information", nil)
+
+    dialog = page.instance_variable_get(:@open_info_dialog)
+    d.check("an info dialog opened for the selected row") { !dialog.nil? }
+    d.check("its title is Process Information") { dialog.dialog.title == "Process Information" }
+    @processes_page_info_dialog = dialog.dialog
+
+    page.list_box.unselect_all
+    page.list_box.signal_emit("selected-rows-changed")
+  end
+
+  d.step("Processes page screenshot with the Information dialog open (its own tick)") do
+    d.shot("13-processes-information-dialog", @processes_page_info_dialog)
+    @processes_page_info_dialog.close
   end
 
   # --- Sidebar navigation ----------------------------------------------------
