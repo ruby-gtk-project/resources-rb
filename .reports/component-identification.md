@@ -1,10 +1,12 @@
-# Component identification — resources-rb (refresh)
+# Component identification — resources-rb (refresh 2)
 
-This supersedes `.reports/component-inventory.md` where the two disagree.
-That file predates commits `f97dbbf` (battery utility + battery page) and
-`0902d50` (dialog-reuse fix); this pass re-reads `lib/` as it stands today
-against `origin/main` and corrects the one place the stale inventory is now
-wrong, then restates the rest with fresh counts.
+This supersedes `.reports/component-inventory.md` and the previous version of
+this file where they disagree. Both predate commit `6eac7de` ("Port the
+process name cell and the process detail/options dialogs"), which built three
+more units that the previous pass of this report listed as missing (rows 9,
+10, 24 below). This pass re-reads `lib/` as it stands at `6eac7de` against
+`origin/main` and corrects those three rows, then restates the rest with
+fresh counts.
 
 Method: `git ls-tree -r --name-only origin/main`, read every `src/ui/**`,
 `src/utils/**` and `data/resources/ui/**/*.ui` file against the corresponding
@@ -24,8 +26,8 @@ unit, upstream source file(s) + its `.ui` joined before comparing).
 | 6 | About dialog | `src/application.rs` (`show_about_dialog`) | `lib/resources/about_dialog.rb` | built |
 | 7 | Settings/Preferences dialog | `src/ui/dialogs/settings_dialog.rs` + `.ui` | `lib/resources/settings_dialog.rb` | built — all 53 schema keys present in `Settings::DEFAULTS` (verified: `grep -c '"[a-z-]*" =>' lib/resources/settings.rb` → 53, upstream `grep -c '<key ' data/net.nokyan.Resources.gschema.xml.in` → 53) |
 | 8 | Process action (confirm kill/stop/continue) dialog | `src/ui/pages/processes/mod.rs` + `applications/mod.rs` shared helpers (no standalone `.ui`) | `lib/resources/process_action_dialog.rb` | built |
-| 9 | **Process details dialog** | `src/ui/dialogs/process_dialog.rs`, `data/resources/ui/dialogs/process_dialog.ui` | — | **missing** |
-| 10 | **Process options (niceness/affinity) dialog** | `src/ui/dialogs/process_options_dialog.rs`, `.ui` | — | **missing** |
+| 9 | Process details dialog | `src/ui/dialogs/process_dialog.rs`, `data/resources/ui/dialogs/process_dialog.ui` | `lib/resources/process_dialog.rb` | **built** (commit `6eac7de`) — not reachable from any page yet (see row 16), driven directly in `test/drive_resources.rb` |
+| 10 | Process options (niceness/affinity) dialog | `src/ui/dialogs/process_options_dialog.rs`, `.ui` | `lib/resources/process_options_dialog.rb` | **built** (commit `6eac7de`), backed by new `Process#affinity`/`#set_affinity` reading `/proc`'s `Cpus_allowed` mask and shelling out to `taskset` — same reachability caveat as row 9 |
 | 11 | **App details dialog** | `src/ui/dialogs/app_dialog.rs`, `data/resources/ui/dialogs/app_dialog.ui` | — | **missing** |
 | 12 | CPU page | `src/ui/pages/cpu.rs` + `.ui` | `lib/resources/cpu_page.rb` | built |
 | 13 | Memory page | `src/ui/pages/memory.rs` + `.ui` | `lib/resources/memory_page.rb` | built |
@@ -39,7 +41,7 @@ unit, upstream source file(s) + its `.ui` joined before comparing).
 | 21 | Graph | `src/ui/widgets/graph.rs` | `lib/resources/graph.rb` | built |
 | 22 | Graph box | `src/ui/widgets/graph_box.rs` + `.ui` | `lib/resources/graph_box.rb` | built |
 | 23 | Double graph box | `src/ui/widgets/double_graph_box.rs` + `.ui` | `lib/resources/double_graph_box.rb` | built |
-| 24 | **Process name cell** | `src/ui/pages/processes/process_name_cell.rs` + `.ui` | — | **missing** |
+| 24 | Process name cell | `src/ui/pages/processes/process_name_cell.rs` + `.ui` | `lib/resources/process_name_cell.rb` | **built** (commit `6eac7de`) — icon + elided name; has no `GtkColumnView` column to be installed into, since row 16 (Processes page) is still missing, so it is driven directly rather than through a live column |
 | 25 | **Application name cell** | `src/ui/pages/applications/application_name_cell.rs` + `.ui` | — | **missing** |
 
 ### Backing (non-widget) utility classes
@@ -71,22 +73,36 @@ unit, upstream source file(s) + its `.ui` joined before comparing).
 ## Totals
 
 - **25 widget/dialog/page units identified upstream** (app, window, 2 sidebar
-  widgets, shortcuts window, 3 dialogs built + 3 missing, 9 pages (3 built +
-  6 missing), 3 widgets built, 2 cells missing).
-- **Built: 14** (app, window, sidebar×2, shortcuts, about, settings,
-  process-action dialog, cpu/memory/battery pages, graph/graph_box/double_graph_box).
-- **Missing: 11** (process-details dialog, process-options dialog, app-details
-  dialog, applications page, processes page, drive page, gpu page, network
-  page, npu page, process-name-cell, application-name-cell).
+  widgets, shortcuts window, 3 dialogs built + 3 missing dialogs [now 1
+  missing], 9 pages (3 built + 6 missing), 3 widgets built, 2 cells [now 1
+  built + 1 missing]).
+- **Built: 17** (app, window, sidebar×2, shortcuts, about, settings,
+  process-action dialog, process-details dialog, process-options dialog,
+  cpu/memory/battery pages, graph/graph_box/double_graph_box,
+  process-name-cell).
+- **Missing: 8** (app-details dialog, applications page, processes page,
+  drive page, gpu page, network page, npu page, application-name-cell).
 - **Backing utils missing: 15 upstream `.rs` files** (app, drive, network,
-  6×gpu, 4×npu, 5×link — gpu and npu count their mod.rs).
+  6×gpu, 4×npu, 5×link — gpu and npu count their mod.rs) — unchanged by this
+  commit; `process.rb` gained `#affinity`/`#set_affinity` but that is an
+  addition to an already-built file, not a new backing-util unit.
 - **Non-code resources missing: desktop entry, metainfo, polkit policy, 3
-  root-helper binaries, and the entire po/ catalogue.**
+  root-helper binaries, and the entire po/ catalogue.** Unchanged.
 
-This matches, almost unit-for-unit, the **14 components** the runtime gate
-says the drive script covers: the gate's "14 components" is the count of
-units actually *built* in `lib/`, not a sample of a larger built surface. The
-gate is exhaustive over what exists, and what exists is 14 of 25 identified
-units (56%) — the remaining 44% (11 units, plus 15 backing-utility files and
+The runtime gate for this round reports **68 checks passed, 0 failed,
+covering 18 components** (re-run live in this audit: `nix develop --command
+xvfb-run -a ruby test/drive_resources.rb` → `68 of 68 checks passed, DRIVE
+OK`, confirmed byte-for-byte against the gate's numbers). That is **off by
+one against this report's own built-unit count of 17**: the drive script's
+"18 components" most likely counts `Resources::Process` (the backing-util
+model class, exercised directly for the affinity round-trip) as a component
+alongside the 17 widget/dialog/page units above, which this report's unit
+boundary (per the `component-identification` skill: top-level widget
+classes and the app class, not backing data classes) does not. This is a
+counting-convention difference, not a hidden extra widget — re-reading
+`test/drive_resources.rb` finds no 18th widget unit, built or driven, beyond
+the 17 listed here. Either way, **17 or 18, the gate is exhaustive only over
+what exists, and what exists is 17 of 25 identified widget/dialog/page units
+(68%)** — the remaining 32% (8 units, plus all 15 backing-utility files and
 all non-code resources) has no component to check yet, let alone a check
-that runs.
+that runs. A component the gate never reaches is unverified, not done.

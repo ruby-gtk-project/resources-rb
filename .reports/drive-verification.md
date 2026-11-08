@@ -1,11 +1,48 @@
 # Drive verification — resources-rb
 
-Ran `nix develop --command xvfb-run -a ruby test/drive_resources.rb` (also
-reachable as the dev shell's own `xvfb-run ruby test/drive_*.rb`, now that it
-is the only `test/drive_*.rb` file). Result: **50 of 50 checks passed,
-`DRIVE OK`**, 9 screenshots written under `tmp/shots/` (gitignored).
+Re-ran live in this audit at commit `6eac7de`:
+`nix develop --command xvfb-run -a ruby test/drive_resources.rb`. Result:
+**68 of 68 checks passed, `DRIVE OK`** — matches this round's stated runtime
+gate (`drive_ok=true`, 68 checks passed, 0 failed, 18 components) exactly.
+Screenshots written under `tmp/shots/` (gitignored), including new
+`11-process-options-dialog.png`.
 
-This supersedes the previous entry in this file (43/43, before `battery.rb`
+This supersedes the previous entry below (50/50, before the process name
+cell and the process detail/options dialogs were ported in commit
+`6eac7de`). See `.reports/component-identification.md` for why this report
+counts 17 built widget/dialog/page units against the gate's "18
+components" — a one-unit counting-convention difference (most likely
+`Resources::Process`, a backing-util model class, counted as its own
+component by the drive script), not a hidden extra widget.
+
+## What changed since the 50/50 run
+
+Three new units, all driven directly in `test/drive_resources.rb` rather
+than through a page, because the page that would reach them (Processes)
+still doesn't exist:
+
+- `ProcessDialog` (read-only process-details dialog) — built, presented
+  against the real main window, screenshotted.
+- `ProcessOptionsDialog` (niceness/priority/CPU-affinity editor) — built,
+  its niceness-vs-priority row visibility, per-CPU affinity switches,
+  "Toggle All" and Apply-button sensitivity all driven and asserted.
+- `ProcessNameCell` (icon + elided name cell) — built, driven directly;
+  has no live `GtkColumnView` column to sit in.
+
+Backing addition: `Process#affinity`/`#set_affinity`, reading `/proc`'s
+`Cpus_allowed` mask and shelling out to `taskset` — the `taskset` call
+itself is exercised by the drive script only insofar as the dialog's Apply
+handler runs without raising; it is not verified against a real process
+whose affinity actually changes afterward (re-checked in this audit: the
+drive script asserts switch-row state and button sensitivity, never reads
+`/proc/<pid>/status`'s `Cpus_allowed` back after Apply to confirm the
+`taskset` call took effect).
+
+## Previous run (50/50, superseded)
+
+Previously: **50 of 50 checks passed, `DRIVE OK`**, 9 screenshots.
+
+This superseded the entry before it (43/43, before `battery.rb`
 and `battery_page.rb` were ported and before this run's dialog-reuse fix).
 
 ## What it covers
